@@ -17,19 +17,18 @@
     <script type="module">
         // --- Firebase Imports ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, query, where, orderBy, doc, setDoc, getDocs, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Permanent Firebase Configuration ---
-        // Yeh aapke app ka permanent "password" hai.
+        // --- Permanent, Live Firebase Configuration ---
+        // Yeh aapke app ka naya, permanent, aur live database hai.
         const firebaseConfig = {
-            // NOTE: Replace these with your actual Firebase project configuration
-            apiKey: "AIzaSy...",
-            authDomain: "your-project.firebaseapp.com",
-            projectId: "your-project",
-            storageBucket: "your-project.appspot.com",
-            messagingSenderId: "...",
-            appId: "..."
+          apiKey: "AIzaSyA_...REPLACE_WITH_YOUR_OWN_CONFIG", // Replace with your actual Firebase config
+          authDomain: "business-erp-app-mukund.firebaseapp.com",
+          projectId: "business-erp-app-mukund",
+          storageBucket: "business-erp-app-mukund.appspot.com",
+          messagingSenderId: "101...",
+          appId: "1:101...:web:..."
         };
 
         // --- Global State ---
@@ -48,8 +47,7 @@
             const statusBar = document.getElementById('status-bar');
 
             try {
-                statusBar.textContent = "Connecting to secure database...";
-                const appId = firebaseConfig.projectId + '-app'; // Create a unique ID for the app instance
+                statusBar.textContent = "Connecting to your secure database...";
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
@@ -58,12 +56,12 @@
                     if (user) {
                         userId = user.uid;
                         statusBar.textContent = "Connection successful. Loading dashboard...";
-                        initDashboard(appId);
+                        initDashboard();
+                        statusBar.classList.remove('bg-blue-100', 'text-blue-800');
                         statusBar.classList.add('bg-green-100', 'text-green-800');
                         setTimeout(() => { statusBar.classList.add('hidden'); }, 2000);
                     } else {
-                         statusBar.textContent = "Authenticating your session...";
-                         // For standalone app, we use anonymous sign-in
+                         statusBar.textContent = "Creating a secure session for you...";
                          await signInAnonymously(auth);
                     }
                 });
@@ -73,17 +71,15 @@
             }
         });
 
-        function initDashboard(appId) {
-            setupListeners(appId);
-            document.getElementById('dataEntryForm').addEventListener('submit', (e) => handleDataEntry(e, appId));
-            document.getElementById('allTransactionsTableBody').addEventListener('click', (e) => handleTableActions(e, appId));
-            document.getElementById('partyLedgerSelect').addEventListener('change', (e) => renderPartyLedger(e.target.value, appId));
-            document.getElementById('chatbotForm').addEventListener('submit', (e) => handleChatbotInput(e, appId));
+        function initDashboard() {
             setupTabSwitching();
+            setupListeners();
+            document.getElementById('dataEntryForm').addEventListener('submit', (e) => handleDataEntry(e));
+            document.getElementById('allTransactionsTableBody').addEventListener('click', (e) => handleTableActions(e));
+            document.getElementById('partyLedgerSelect').addEventListener('change', (e) => renderPartyLedger(e.target.value));
+            document.getElementById('chatbotForm').addEventListener('submit', (e) => handleChatbotInput(e));
         }
 
-        // --- Rest of the JavaScript code remains the same as before ---
-        
         function setupTabSwitching() {
             const tabs = document.querySelectorAll('.tab-btn');
             const tabContents = document.querySelectorAll('.tab-content');
@@ -98,31 +94,35 @@
             if(document.getElementById('dataEntryTab')) { document.getElementById('dataEntryTab').click(); }
         }
         
-        function setupListeners(appId) {
+        function getCollectionPath(collectionName) {
+            return `users/${userId}/${collectionName}`;
+        }
+        
+        function setupListeners() {
             if (!userId) return;
             populateProductDropdowns();
-            const transactionsCol = collection(db, `artifacts/${appId}/users/${userId}/transactions`);
+            const transactionsCol = collection(db, getCollectionPath('transactions'));
             const q = query(transactionsCol, orderBy('date', 'desc'));
             onSnapshot(q, (snapshot) => {
                 transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                updateAllTabs(appId);
+                updateAllTabs();
             });
-            const partiesCol = collection(db, `artifacts/${appId}/users/${userId}/parties`);
+            const partiesCol = collection(db, getCollectionPath('parties'));
             onSnapshot(query(partiesCol), (snapshot) => {
                 parties = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 populatePartyLedgerDropdown();
             });
         }
         
-        function updateAllTabs(appId) {
+        function updateAllTabs() {
             renderAllTransactionsTable();
             renderSalesReports();
             renderInventoryReport();
             renderUnitEconomics();
-            renderFinancialStatements(appId);
+            renderFinancialStatements();
         }
 
-        async function handleDataEntry(e, appId) {
+        async function handleDataEntry(e) {
             e.preventDefault();
             if (!userId) { alert('Authentication not ready.'); return; }
             
@@ -137,16 +137,16 @@
             };
 
             if (transactionId) {
-                const transactionRef = doc(db, `artifacts/${appId}/users/${userId}/transactions`, transactionId);
+                const transactionRef = doc(db, getCollectionPath('transactions'), transactionId);
                 await updateDoc(transactionRef, transaction);
-                await deleteJournalEntriesForTransaction(transactionId, appId);
-                await createJournalEntries(transaction, transactionId, appId);
+                await deleteJournalEntriesForTransaction(transactionId);
+                await createJournalEntries(transaction, transactionId);
                 showNotification('Transaction updated successfully!');
             } else {
-                const transactionsCol = collection(db, `artifacts/${appId}/users/${userId}/transactions`);
+                const transactionsCol = collection(db, getCollectionPath('transactions'));
                 const docRef = await addDoc(transactionsCol, transaction);
-                await createJournalEntries(transaction, docRef.id, appId);
-                await updateParty(transaction.party, transaction.type, appId);
+                await createJournalEntries(transaction, docRef.id);
+                await updateParty(transaction.party, transaction.type);
                 showNotification('Transaction saved successfully!');
             }
             
@@ -165,14 +165,14 @@
             });
         }
         
-        async function handleTableActions(e, appId) {
+        async function handleTableActions(e) {
             const target = e.target;
             const txId = target.dataset.id;
             if (!txId) return;
 
             if (target.classList.contains('delete-btn')) {
-                await deleteJournalEntriesForTransaction(txId, appId);
-                await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/transactions`, txId));
+                await deleteJournalEntriesForTransaction(txId);
+                await deleteDoc(doc(db, getCollectionPath('transactions'), txId));
                 showNotification('Transaction deleted successfully!', 'bg-red-500');
 
             } else if (target.classList.contains('modify-btn')) {
@@ -193,8 +193,8 @@
             }
         }
         
-        async function deleteJournalEntriesForTransaction(txId, appId) {
-            const journalCol = collection(db, `artifacts/${appId}/users/${userId}/journal`);
+        async function deleteJournalEntriesForTransaction(txId) {
+            const journalCol = collection(db, getCollectionPath('journal'));
             const q = query(journalCol, where('transactionId', '==', txId));
             const journalSnapshot = await getDocs(q);
             const deletePromises = [];
@@ -210,7 +210,7 @@
             document.getElementById('date').valueAsDate = new Date();
         }
 
-        async function handleChatbotInput(e, appId) {
+        async function handleChatbotInput(e) {
             e.preventDefault();
             const input = document.getElementById('chatbotInput');
             const text = input.value.trim();
@@ -225,11 +225,11 @@
                 const confirmationMsg = `OK, I've recorded: ${parsedTx.type} of ${parsedTx.quantity} ${parsedTx.product} for ₹${parsedTx.amount.toFixed(2)} on ${parsedTx.date}.`;
                 addChatMessage('bot', confirmationMsg);
                 
-                const transactionsCol = collection(db, `artifacts/${appId}/users/${userId}/transactions`);
+                const transactionsCol = collection(db, getCollectionPath('transactions'));
                 const docRef = await addDoc(transactionsCol, parsedTx);
-                await createJournalEntries(parsedTx, docRef.id, appId);
-                await updateParty(parsedTx.party, parsedTx.type, appId);
-                showNotification('Transaction saved via Chatbot!`);
+                await createJournalEntries(parsedTx, docRef.id);
+                await updateParty(parsedTx.party, parsedTx.type);
+                showNotification('Transaction saved via Chatbot!');
             }
             input.value = '';
         }
@@ -340,121 +340,5 @@
                 const avgCostPrice = getAvgCostForProduct(product.name);
                 
                 const profit = avgSellPrice - avgCostPrice;
-                const margin = avgSellPrice > 0 ? (profit / avgSellPrice) * 100 : 0;
+                const margin = avgSellPrice > 0 ? (profit / avgSellPric
 
-                economicsBody.innerHTML += `<tr class="border-b"><td class="py-2 px-4 font-medium">${product.name}</td><td class="py-2 px-4 text-right">₹${avgSellPrice.toFixed(2)}</td><td class="py-2 px-4 text-right">₹${avgCostPrice.toFixed(2)}</td><td class="py-2 px-4 text-right font-bold text-green-600">₹${profit.toFixed(2)}</td><td class="py-2 px-4 text-right font-bold text-blue-600">${margin.toFixed(2)}%</td></tr>`;
-            });
-        }
-        
-        async function createJournalEntries(tx, txId, appId) {
-            const journalCol = collection(db, `artifacts/${appId}/users/${userId}/journal`);
-            let costOfGoodsSold = 0;
-            if (tx.type === 'sale' && tx.product && tx.quantity > 0) {
-                const avgCost = getAvgCostForProduct(tx.product);
-                costOfGoodsSold = avgCost * tx.quantity;
-            }
-
-            let entries = [];
-            const baseEntry = { date: tx.date, transactionId: txId, narration: tx.description };
-             switch(tx.type) {
-                case 'sale':
-                    entries.push({ ...baseEntry, account: tx.party || 'Cash/Bank', debit: tx.amount, credit: 0 });
-                    entries.push({ ...baseEntry, account: 'Sales', debit: 0, credit: tx.amount });
-                    if(costOfGoodsSold > 0) {
-                        entries.push({ ...baseEntry, account: 'Cost of Goods Sold', debit: costOfGoodsSold, credit: 0 });
-                        entries.push({ ...baseEntry, account: 'Inventory', debit: 0, credit: costOfGoodsSold });
-                    }
-                    break;
-                case 'purchase': entries.push({ ...baseEntry, account: 'Inventory', debit: tx.amount, credit: 0 }); entries.push({ ...baseEntry, account: tx.party || 'Cash/Bank', debit: 0, credit: tx.amount }); break;
-                case 'expense': entries.push({ ...baseEntry, account: tx.description || 'General Expense', debit: tx.amount, credit: 0 }); entries.push({ ...baseEntry, account: 'Cash/Bank', debit: 0, credit: tx.amount }); break;
-                case 'payment_received': entries.push({ ...baseEntry, account: 'Cash/Bank', debit: tx.amount, credit: 0 }); entries.push({ ...baseEntry, account: tx.party, debit: 0, credit: tx.amount }); break;
-                case 'payment_made': entries.push({ ...baseEntry, account: tx.party, debit: tx.amount, credit: 0 }); entries.push({ ...baseEntry, account: 'Cash/Bank', debit: 0, credit: tx.amount }); break;
-            }
-            for (const entry of entries) { if(entry.account) await addDoc(journalCol, entry); }
-        }
-        
-        async function updateParty(partyName, type, appId) { if (!partyName) return; const partyType = (type === 'sale' || type === 'payment_received') ? 'Customer' : 'Supplier'; const partyRef = doc(db, `artifacts/${appId}/users/${userId}/parties`, partyName); await setDoc(partyRef, { name: partyName, type: partyType }, { merge: true }); }
-        function populateProductDropdowns() { const productSelect = document.getElementById('product'); if (productSelect) { productSelect.innerHTML = `<option value="">Select Product</option>` + products.map(p => `<option value="${p.name}">${p.name}</option>`).join(''); } }
-        function renderSalesReports() { const salesBody = document.getElementById('salesReportBody'); salesBody.innerHTML = ''; let totalRevenue = 0; const salesTransactions = transactions.filter(t => t.type === 'sale'); salesTransactions.forEach(tx => { totalRevenue += tx.amount; salesBody.innerHTML += `<tr class="border-b"><td class="py-2 px-4">${tx.date}</td><td class="py-2 px-4">${tx.party}</td><td class="py-2 px-4">${tx.product}</td><td class="py-2 px-4 text-center">${tx.quantity}</td><td class="py-2 px-4 text-right">₹${tx.amount.toFixed(2)}</td></tr>`; }); document.getElementById('totalSalesRevenue').textContent = `₹${totalRevenue.toFixed(2)}`; }
-        async function renderFinancialStatements(appId) { if (!userId) return; const journalCol = collection(db, `artifacts/${appId}/users/${userId}/journal`); const journalSnapshot = await getDocs(query(journalCol)); const journalEntries = journalSnapshot.docs.map(d => d.data()); renderJournal(journalEntries); const trialBalance = generateTrialBalance(journalEntries); renderTrialBalance(trialBalance); renderPandL(trialBalance); renderBalanceSheet(trialBalance); }
-        function renderJournal(entries) { const journalBody = document.getElementById('journalBody'); journalBody.innerHTML = ''; entries.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(entry => { journalBody.innerHTML += `<tr class="border-b"><td class="py-1 px-2">${entry.date}</td><td class="py-1 px-2">${entry.account}</td><td class="py-1 px-2 text-right">${entry.debit > 0 ? `₹${entry.debit.toFixed(2)}` : ''}</td><td class="py-1 px-2 text-right">${entry.credit > 0 ? `₹${entry.credit.toFixed(2)}` : ''}</td></tr>`; }); }
-        function generateTrialBalance(entries) { const accounts = {}; entries.forEach(entry => { if (!accounts[entry.account]) accounts[entry.account] = { debit: 0, credit: 0 }; accounts[entry.account].debit += entry.debit; accounts[entry.account].credit += entry.credit; }); return accounts; }
-        function renderTrialBalance(trialBalance) { const tbBody = document.getElementById('trialBalanceBody'); tbBody.innerHTML = ''; let totalDebit = 0, totalCredit = 0; Object.keys(trialBalance).sort().forEach(acc => { totalDebit += trialBalance[acc].debit; totalCredit += trialBalance[acc].credit; tbBody.innerHTML += `<tr class="border-b"><td class="py-1 px-2">${acc}</td><td class="py-1 px-2 text-right">₹${trialBalance[acc].debit.toFixed(2)}</td><td class="py-1 px-2 text-right">₹${trialBalance[acc].credit.toFixed(2)}</td></tr>`; }); document.getElementById('tbTotalDebit').textContent = `₹${totalDebit.toFixed(2)}`; document.getElementById('tbTotalCredit').textContent = `₹${totalCredit.toFixed(2)}`; }
-        function renderPandL(trialBalance) { const sales = trialBalance['Sales'] ? trialBalance['Sales'].credit - trialBalance['Sales'].debit : 0; const cogs = trialBalance['Cost of Goods Sold'] ? trialBalance['Cost of Goods Sold'].debit - trialBalance['Cost of Goods Sold'].credit : 0; const grossProfit = sales - cogs; let expenses = 0; for (const acc in trialBalance) { if (acc.toLowerCase().includes('expense')) { expenses += trialBalance[acc].debit - trialBalance[acc].credit; } } const netProfit = grossProfit - expenses; document.getElementById('plSales').textContent = `₹${sales.toFixed(2)}`; document.getElementById('plCogs').textContent = `₹${cogs.toFixed(2)}`; document.getElementById('plGrossProfit').textContent = `₹${grossProfit.toFixed(2)}`; document.getElementById('plExpenses').textContent = `₹${expenses.toFixed(2)}`; document.getElementById('plNetProfit').textContent = `₹${netProfit.toFixed(2)}`; }
-        function renderBalanceSheet(trialBalance) { const cash = trialBalance['Cash/Bank'] ? trialBalance['Cash/Bank'].debit - trialBalance['Cash/Bank'].credit : 0; const inventory = trialBalance['Inventory'] ? trialBalance['Inventory'].debit - trialBalance['Inventory'].credit : 0; document.getElementById('bsCash').textContent = `₹${cash.toFixed(2)}`; document.getElementById('bsInventory').textContent = `₹${inventory.toFixed(2)}`; }
-        function populatePartyLedgerDropdown() { const select = document.getElementById('partyLedgerSelect'); select.innerHTML = '<option value="">Select Party</option>' + parties.map(p => `<option value="${p.name}">${p.name} (${p.type})</option>`).join(''); }
-        async function renderPartyLedger(partyName, appId) { const ledgerBody = document.getElementById('partyLedgerBody'); ledgerBody.innerHTML = ''; if (!partyName) return; const q = query(collection(db, `artifacts/${appId}/users/${userId}/journal`), where('account', '==', partyName), orderBy('date')); const snapshot = await getDocs(q); let balance = 0; snapshot.docs.forEach(doc => { const entry = doc.data(); balance += entry.debit - entry.credit; ledgerBody.innerHTML += `<tr class="border-b"><td class="py-1 px-2">${entry.date}</td><td class="py-1 px-2">${entry.narration || ''}</td><td class="py-1 px-2 text-right">${entry.debit > 0 ? `₹${entry.debit.toFixed(2)}` : ''}</td><td class="py-1 px-2 text-right">${entry.credit > 0 ? `₹${entry.credit.toFixed(2)}` : ''}</td><td class="py-1 px-2 text-right font-bold">₹${balance.toFixed(2)}</td></tr>`; }); }
-        function showNotification(message, bgColor = 'bg-green-500') { const notification = document.getElementById('notification'); notification.textContent = message; notification.className = `fixed top-5 right-5 text-white py-2 px-6 rounded-lg shadow-lg ${bgColor} z-50`; setTimeout(() => { notification.className += ' hidden'; }, 3000); }
-
-    </script>
-    <!-- ... (rest of the HTML body remains the same) ... -->
-    <style> body { font-family: 'Inter', sans-serif; } .tab-btn { transition: all 0.2s ease-in-out; } </style>
-</head>
-<body class="bg-gray-100">
-    <div id="notification" class="hidden"></div>
-    <div class="container mx-auto p-4 sm:p-2">
-        <div id="status-bar" class="p-4 mb-4 text-center rounded-lg shadow bg-blue-100 text-blue-800"></div>
-        <header class="mb-4">
-            <h1 class="text-3xl font-bold text-gray-800">Business ERP Dashboard</h1>
-            <p class="text-gray-500">Aapke business ka complete management system.</p>
-        </header>
-
-        <div class="bg-white rounded-lg shadow-md p-2 mb-6">
-            <nav class="flex flex-col sm:flex-row sm:space-x-1">
-                <button id="dataEntryTab" data-tab="dataEntryContent" class="tab-btn flex-1 py-2 px-3 rounded-md text-sm font-medium text-gray-600 hover:bg-indigo-100">1. Data Entry</button>
-                <button data-tab="salesReportContent" class="tab-btn flex-1 py-2 px-3 rounded-md text-sm font-medium text-gray-600 hover:bg-indigo-100">2. Sales Report</button>
-                <button data-tab="inventoryContent" class="tab-btn flex-1 py-2 px-3 rounded-md text-sm font-medium text-gray-600 hover:bg-indigo-100">3. Inventory</button>
-                <button data-tab="economicsContent" class="tab-btn flex-1 py-2 px-3 rounded-md text-sm font-medium text-gray-600 hover:bg-indigo-100">4. Unit Economics</button>
-                <button data-tab="financialsContent" class="tab-btn flex-1 py-2 px-3 rounded-md text-sm font-medium text-gray-600 hover:bg-indigo-100">5. Financials</button>
-            </nav>
-        </div>
-
-        <main>
-            <div id="dataEntryContent" class="tab-content hidden space-y-6">
-                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="bg-white p-6 rounded-lg shadow-md">
-                        <h2 class="text-xl font-semibold mb-4">Naya Transaction Enter Karein</h2>
-                        <form id="dataEntryForm" class="space-y-4">
-                            <input type="hidden" id="editTransactionId" name="editTransactionId">
-                            <input type="date" id="date" required class="w-full p-2 border rounded-md" value="">
-                            <script>document.getElementById('date').valueAsDate = new Date();</script>
-                            <select id="type" required class="w-full p-2 border rounded-md"> <option value="sale">Sale</option> <option value="purchase">Purchase</option> <option value="expense">Expense</option> <option value="payment_received">Payment Received</option> <option value="payment_made">Payment Made</option> </select>
-                            <input type="text" id="party" placeholder="Customer/Supplier ka Naam" class="w-full p-2 border rounded-md">
-                            <select id="product" class="w-full p-2 border rounded-md"></select>
-                            <input type="number" id="quantity" placeholder="Quantity" class="w-full p-2 border rounded-md">
-                            <input type="number" id="amount" step="0.01" placeholder="Total Amount (₹)" required class="w-full p-2 border rounded-md">
-                            <textarea id="description" placeholder="Description..." class="w-full p-2 border rounded-md"></textarea>
-                            <button type="submit" class="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700">Save Transaction</button>
-                        </form>
-                    </div>
-                     <div class="bg-white p-6 rounded-lg shadow-md">
-                        <h2 class="text-xl font-semibold mb-4">Chat Assistant</h2>
-                        <div class="h-96 bg-gray-50 border rounded-lg p-4 flex flex-col justify-between">
-                            <div id="chatbox" class="flex-grow overflow-y-auto flex flex-col space-y-2"></div>
-                            <form id="chatbotForm" class="mt-4 flex">
-                                <input id="chatbotInput" type="text" placeholder="e.g., sold 10 handwash @70 each" class="flex-grow p-2 border rounded-l-md focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                                <button type="submit" class="bg-indigo-600 text-white px-4 rounded-r-md font-semibold hover:bg-indigo-700">Send</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-                <div class="bg-white p-6 rounded-lg shadow-md">
-                     <h2 class="text-xl font-semibold mb-4">All Transactions</h2>
-                     <div class="h-96 overflow-y-auto border rounded-md">
-                        <table class="w-full text-sm">
-                            <thead class="sticky top-0 bg-gray-100 z-10"><tr class="text-left"><th class="py-2 px-3">Date</th><th class="py-2 px-3">Type</th><th class="py-2 px-3">Description</th><th class="py-2 px-3 text-right">Amount</th><th class="py-2 px-3 text-center">Actions</th></tr></thead>
-                            <tbody id="allTransactionsTableBody"></tbody>
-                        </table>
-                     </div>
-                </div>
-            </div>
-            
-            <!-- Other Tabs -->
-             <div id="salesReportContent" class="tab-content hidden bg-white p-6 rounded-lg shadow-md"><h2 class="text-xl font-semibold mb-4">Detailed Sales Report</h2><table class="w-full text-sm"><thead><tr class="bg-gray-100 text-left"><th class="p-2">Date</th><th>Customer</th><th>Product</th><th class="text-center">Quantity</th><th class="text-right">Amount</th></tr></thead><tbody id="salesReportBody"></tbody><tfoot><tr class="font-bold bg-gray-50"><td colspan="4" class="p-2 text-right">Total Revenue:</td><td id="totalSalesRevenue" class="p-2 text-right"></td></tr></tfoot></table></div>
-            <div id="inventoryContent" class="tab-content hidden bg-white p-6 rounded-lg shadow-md"><h2 class="text-xl font-semibold mb-4">Live Inventory Report</h2><table class="w-full text-sm"><thead><tr class="bg-gray-100 text-left"><th class="p-2">Product</th><th class="text-center">Purchased (In)</th><th class="text-center">Sold (Out)</th><th class="text-center">Closing Stock</th><th class="text-right">Stock Value</th></tr></thead><tbody id="inventoryReportBody"></tbody><tfoot><tr class="font-bold bg-gray-50"><td colspan="4" class="p-2 text-right">Total Inventory Value:</td><td id="totalInventoryValue" class="p-2 text-right"></td></tr></tfoot></table></div>
-            <div id="economicsContent" class="tab-content hidden bg-white p-6 rounded-lg shadow-md"><h2 class="text-xl font-semibold mb-4">Product Unit Economics</h2><table class="w-full text-sm"><thead><tr class="bg-gray-100 text-left"><th class="p-2">Product</th><th class="text-right">Avg. Selling Price</th><th class="text-right">Avg. Cost Price</th><th class="text-right">Gross Profit/Unit</th><th class="text-right">Gross Margin %</th></tr></thead><tbody id="unitEconomicsBody"></tbody></table></div>
-            <div id="financialsContent" class="tab-content hidden space-y-6"><div class="grid grid-cols-1 lg:grid-cols-2 gap-6"><div class="bg-white p-4 rounded-lg shadow-md"><h3 class="font-semibold mb-2">Profit & Loss Statement</h3><div class="space-y-2 text-sm"><div class="flex justify-between p-2 rounded-md"><span class="text-gray-600">Total Sales</span><span id="plSales" class="font-medium">₹0.00</span></div><div class="flex justify-between p-2 rounded-md"><span class="text-gray-600">Cost of Goods Sold</span><span id="plCogs" class="font-medium">₹0.00</span></div><div class="flex justify-between p-2 bg-gray-100 font-bold rounded-md"><span class="">Gross Profit</span><span id="plGrossProfit" class="">₹0.00</span></div><div class="flex justify-between p-2 rounded-md"><span class="text-gray-600">Operating Expenses</span><span id="plExpenses" class="font-medium">₹0.00</span></div><div class="flex justify-between p-2 bg-gray-200 font-bold rounded-md"><span class="">Net Profit</span><span id="plNetProfit" class="">₹0.00</span></div></div></div><div class="bg-white p-4 rounded-lg shadow-md"><h3 class="font-semibold mb-2">Balance Sheet (Simplified)</h3><div class="space-y-2 text-sm"><p class="font-bold text-gray-700">Assets</p><div class="flex justify-between p-2 rounded-md"><span class="text-gray-600">Cash & Bank</span><span id="bsCash" class="font-medium">₹0.00</span></div><div class="flex justify-between p-2 rounded-md"><span class="text-gray-600">Inventory</span><span id="bsInventory" class="font-medium">₹0.00</span></div></div></div></div><div class="grid grid-cols-1 lg:grid-cols-2 gap-6"><div class="bg-white p-4 rounded-lg shadow-md"><h3 class="font-semibold mb-2">Journal Entries</h3><div class="h-64 overflow-y-auto border rounded-md"><table class="w-full text-xs"><thead><tr class="bg-gray-50 sticky top-0"><th class="p-1 text-left">Date</th><th class="p-1 text-left">Account</th><th class="p-1 text-right">Debit</th><th class="p-1 text-right">Credit</th></tr></thead><tbody id="journalBody"></tbody></table></div></div><div class="bg-white p-4 rounded-lg shadow-md"><h3 class="font-semibold mb-2">Trial Balance</h3><div class="h-64 overflow-y-auto border rounded-md"><table class="w-full text-xs"><thead><tr class="bg-gray-50 sticky top-0"><th class="p-1 text-left">Account</th><th class="p-1 text-right">Debit</th><th class="p-1 text-right">Credit</th></tr></thead><tbody id="trialBalanceBody"></tbody><tfoot><tr class="font-bold bg-gray-100 sticky bottom-0"><td class="p-1">Total</td><td id="tbTotalDebit" class="p-1 text-right"></td><td id="tbTotalCredit" class="p-1 text-right"></td></tr></tfoot></table></div></div></div><div class="bg-white p-6 rounded-lg shadow-md"><div class="flex justify-between items-center mb-4"><h3 class="text-lg font-semibold">Party Ledgers (Khaata)</h3><select id="partyLedgerSelect" class="p-2 border rounded-md text-sm"></select></div><div class="h-80 overflow-y-auto border rounded-md"><table class="w-full text-sm"><thead><tr class="bg-gray-50 sticky top-0"><th class="p-2 text-left">Date</th><th class="p-2 text-left">Particulars</th><th class="p-2 text-right">Debit</th><th class="p-2 text-right">Credit</th><th class="p-2 text-right">Balance</th></tr></thead><tbody id="partyLedgerBody"></tbody></table></div></div></div>
-        </main>
-    </div>
-</body>
-</html>
