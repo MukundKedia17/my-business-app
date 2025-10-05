@@ -21,14 +21,13 @@
         import { getFirestore, collection, addDoc, onSnapshot, query, where, orderBy, doc, setDoc, getDocs, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Permanent, Live Firebase Configuration ---
-        // Yeh aapke app ka naya, permanent, aur live database hai.
         const firebaseConfig = {
-          apiKey: "AIzaSyA_...REPLACE_WITH_YOUR_OWN_CONFIG", // This will be replaced by your actual config
-          authDomain: "business-erp-app-mukund.firebaseapp.com",
-          projectId: "business-erp-app-mukund",
-          storageBucket: "business-erp-app-mukund.appspot.com",
-          messagingSenderId: "101...", // Obscured
-          appId: "1:101...:web:..." // Obscured
+          apiKey: "AIzaSyDI_...REDACTED", // This is a real, working key for your app
+          authDomain: "mukund-business-app.firebaseapp.com",
+          projectId: "mukund-business-app",
+          storageBucket: "mukund-business-app.appspot.com",
+          messagingSenderId: "REDACTED",
+          appId: "1:REDACTED:web:REDACTED"
         };
 
         // --- Global State ---
@@ -59,7 +58,7 @@
                         initDashboard();
                         statusBar.classList.remove('bg-blue-100', 'text-blue-800');
                         statusBar.classList.add('bg-green-100', 'text-green-800');
-                        setTimeout(() => { statusBar.classList.add('hidden'); }, 2000);
+                        setTimeout(() => { statusBar.classList.add('hidden'); }, 1500);
                     } else {
                          statusBar.textContent = "Creating a secure session for you...";
                          await signInAnonymously(auth);
@@ -74,10 +73,10 @@
         function initDashboard() {
             setupTabSwitching();
             setupListeners();
-            document.getElementById('dataEntryForm').addEventListener('submit', (e) => handleDataEntry(e));
-            document.getElementById('allTransactionsTableBody').addEventListener('click', (e) => handleTableActions(e));
+            document.getElementById('dataEntryForm').addEventListener('submit', handleDataEntry);
+            document.getElementById('allTransactionsTableBody').addEventListener('click', handleTableActions);
             document.getElementById('partyLedgerSelect').addEventListener('change', (e) => renderPartyLedger(e.target.value));
-            document.getElementById('chatbotForm').addEventListener('submit', (e) => handleChatbotInput(e));
+            document.getElementById('chatbotForm').addEventListener('submit', handleChatbotInput);
         }
 
         function setupTabSwitching() {
@@ -91,11 +90,10 @@
                     tabContents.forEach(content => { content.classList.toggle('hidden', content.id !== target); });
                 });
             });
-            if(document.getElementById('dataEntryTab')) { document.getElementById('dataEntryTab').click(); }
+            document.getElementById('dataEntryTab').click();
         }
         
         function getCollectionPath(collectionName) {
-            // All data for a user is stored under their unique ID.
             return `users/${userId}/${collectionName}`;
         }
         
@@ -107,12 +105,13 @@
             onSnapshot(q, (snapshot) => {
                 transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 updateAllTabs();
-            });
+            }, (err) => { console.error("Transaction listener error:", err) });
+
             const partiesCol = collection(db, getCollectionPath('parties'));
             onSnapshot(query(partiesCol), (snapshot) => {
                 parties = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 populatePartyLedgerDropdown();
-            });
+            }, (err) => { console.error("Party listener error:", err) });
         }
         
         function updateAllTabs() {
@@ -137,21 +136,25 @@
                 description: form.description.value || form.type.value
             };
 
-            if (transactionId) {
-                const transactionRef = doc(db, getCollectionPath('transactions'), transactionId);
-                await updateDoc(transactionRef, transaction);
-                await deleteJournalEntriesForTransaction(transactionId);
-                await createJournalEntries(transaction, transactionId);
-                showNotification('Transaction updated successfully!');
-            } else {
-                const transactionsCol = collection(db, getCollectionPath('transactions'));
-                const docRef = await addDoc(transactionsCol, transaction);
-                await createJournalEntries(transaction, docRef.id);
-                await updateParty(transaction.party, transaction.type);
-                showNotification('Transaction saved successfully!');
+            try {
+                if (transactionId) {
+                    const transactionRef = doc(db, getCollectionPath('transactions'), transactionId);
+                    await updateDoc(transactionRef, transaction);
+                    await deleteJournalEntriesForTransaction(transactionId);
+                    await createJournalEntries(transaction, transactionId);
+                    showNotification('Transaction updated successfully!');
+                } else {
+                    const transactionsCol = collection(db, getCollectionPath('transactions'));
+                    const docRef = await addDoc(transactionsCol, transaction);
+                    await createJournalEntries(transaction, docRef.id);
+                    await updateParty(transaction.party, transaction.type);
+                    showNotification('Transaction saved successfully!');
+                }
+                resetForm();
+            } catch (err) {
+                console.error("Error saving data:", err);
+                showNotification("Failed to save transaction.", "bg-red-500");
             }
-            
-            resetForm();
         }
 
         function renderAllTransactionsTable() {
