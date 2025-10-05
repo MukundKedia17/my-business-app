@@ -20,6 +20,18 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, query, where, orderBy, doc, setDoc, getDocs, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // --- Permanent Firebase Configuration ---
+        // Yeh aapke app ka permanent "password" hai.
+        const firebaseConfig = {
+            // NOTE: Replace these with your actual Firebase project configuration
+            apiKey: "AIzaSy...",
+            authDomain: "your-project.firebaseapp.com",
+            projectId: "your-project",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "...",
+            appId: "..."
+        };
+
         // --- Global State ---
         let userId;
         let transactions = [];
@@ -35,20 +47,9 @@
         document.addEventListener('DOMContentLoaded', () => {
             const statusBar = document.getElementById('status-bar');
 
-            if (typeof __firebase_config === 'undefined' || !__firebase_config) {
-                statusBar.innerHTML = `<h3 class="font-bold">Connection Error!</h3><p class="text-sm">This dashboard cannot connect to the database when run as a local file.</p><p class="text-sm mt-2">Please use it within the original platform for full functionality.</p>`;
-                statusBar.classList.remove('hidden');
-                statusBar.classList.add('bg-red-100', 'text-red-800');
-                document.getElementById('dataEntryForm').querySelector('button[type="submit"]').disabled = true;
-                document.getElementById('dataEntryForm').querySelector('button[type="submit"]').textContent = 'Connection Failed';
-                setupTabSwitching();
-                return;
-            }
-
             try {
                 statusBar.textContent = "Connecting to secure database...";
-                const firebaseConfig = JSON.parse(__firebase_config);
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const appId = firebaseConfig.projectId + '-app'; // Create a unique ID for the app instance
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
@@ -62,7 +63,8 @@
                         setTimeout(() => { statusBar.classList.add('hidden'); }, 2000);
                     } else {
                          statusBar.textContent = "Authenticating your session...";
-                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } else { await signInAnonymously(auth); }
+                         // For standalone app, we use anonymous sign-in
+                         await signInAnonymously(auth);
                     }
                 });
             } catch (error) {
@@ -80,6 +82,8 @@
             setupTabSwitching();
         }
 
+        // --- Rest of the JavaScript code remains the same as before ---
+        
         function setupTabSwitching() {
             const tabs = document.querySelectorAll('.tab-btn');
             const tabContents = document.querySelectorAll('.tab-content');
@@ -225,7 +229,7 @@
                 const docRef = await addDoc(transactionsCol, parsedTx);
                 await createJournalEntries(parsedTx, docRef.id, appId);
                 await updateParty(parsedTx.party, parsedTx.type, appId);
-                showNotification('Transaction saved via Chatbot!');
+                showNotification('Transaction saved via Chatbot!`);
             }
             input.value = '';
         }
@@ -383,6 +387,7 @@
         function showNotification(message, bgColor = 'bg-green-500') { const notification = document.getElementById('notification'); notification.textContent = message; notification.className = `fixed top-5 right-5 text-white py-2 px-6 rounded-lg shadow-lg ${bgColor} z-50`; setTimeout(() => { notification.className += ' hidden'; }, 3000); }
 
     </script>
+    <!-- ... (rest of the HTML body remains the same) ... -->
     <style> body { font-family: 'Inter', sans-serif; } .tab-btn { transition: all 0.2s ease-in-out; } </style>
 </head>
 <body class="bg-gray-100">
@@ -453,4 +458,3 @@
     </div>
 </body>
 </html>
-
