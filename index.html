@@ -20,15 +20,29 @@
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, query, where, orderBy, doc, setDoc, getDocs, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Permanent, Live Firebase Configuration ---
-        const firebaseConfig = {
-          apiKey: "AIzaSyDI_s-...", // This is a real, working key for your app
-          authDomain: "mukund-business-app.firebaseapp.com",
-          projectId: "mukund-business-app",
-          storageBucket: "mukund-business-app.appspot.com",
-          messagingSenderId: "...",
-          appId: "1:...:web:..."
-        };
+        // --- Yahaan Apni Firebase Config Paste Karein ---
+        // Neeche diye gaye placeholder ko apne asli firebaseConfig code se replace karein
+        // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyCzZ6tqTM9QjyHKX2iIM1y_NLK0mepbhPA",
+  authDomain: "my-business-app-2025.firebaseapp.com",
+  projectId: "my-business-app-2025",
+  storageBucket: "my-business-app-2025.firebasestorage.app",
+  messagingSenderId: "532223399247",
+  appId: "1:532223399247:web:aad37bc8342e6d0a91a13a",
+  measurementId: "G-6498RK338P"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
 
         // --- Global State ---
         let userId;
